@@ -45,6 +45,7 @@ export default function Home() {
   const [newDate, setNewDate] = useState('')
   const [newTime, setNewTime] = useState('')
   const [newLocation, setNewLocation] = useState('')
+  const [editingEventId, setEditingEventId] = useState<string | null>(null)
 
   const currentMember = databaseMembers.find(member => member.name === currentUser)
   const canSwitchAdminMode = isVerified && currentMember?.role === 'admin'
@@ -103,6 +104,7 @@ export default function Home() {
   }
 
   const addEvent = async () => {
+    if (!isAdmin) return
     if (!newTitle || !newDate) return alert('請填寫活動名稱和日期')
     await supabase.from('events').insert({
       title: newTitle,
@@ -114,7 +116,37 @@ export default function Home() {
     await fetchData()
   }
 
+  const startEditingEvent = (event: Event) => {
+    setEditingEventId(event.id)
+    setNewTitle(event.title)
+    setNewDate(event.event_date)
+    setNewTime(event.event_time)
+    setNewLocation(event.location)
+  }
+
+  const cancelEditingEvent = () => {
+    setEditingEventId(null)
+    setNewTitle('')
+    setNewDate('')
+    setNewTime('')
+    setNewLocation('')
+  }
+
+  const updateEvent = async () => {
+    if (!isAdmin || !editingEventId) return
+    if (!newTitle || !newDate) return alert('請填寫活動名稱和日期')
+    await supabase.from('events').update({
+      title: newTitle,
+      event_date: newDate,
+      event_time: newTime,
+      location: newLocation,
+    }).eq('id', editingEventId)
+    cancelEditingEvent()
+    await fetchData()
+  }
+
   const deleteEvent = async (id: string) => {
+    if (!isAdmin) return
     if (!confirm('確定刪除此活動？')) return
     await supabase.from('events').delete().eq('id', id)
     await fetchData()
@@ -464,7 +496,7 @@ export default function Home() {
         {/* Admin Tab */}
         {tab === 'admin' && isAdmin && (
           <>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#111', marginBottom: 12 }}>新增活動</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#111', marginBottom: 12 }}>{editingEventId ? '修改活動' : '新增活動'}</div>
             <div style={{ marginBottom: 12 }}>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 5 }}>活動名稱</label>
               <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="例如：年度聚餐" style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 14, boxSizing: 'border-box' }} />
@@ -481,9 +513,14 @@ export default function Home() {
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 5 }}>地點</label>
               <input value={newLocation} onChange={e => setNewLocation(e.target.value)} placeholder="例如：市中心餐廳" style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 14, boxSizing: 'border-box' }} />
             </div>
-            <button onClick={addEvent} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', background: '#111', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
-              ➕ 新增活動
+            <button onClick={editingEventId ? updateEvent : addEvent} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', background: '#111', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+              {editingEventId ? '儲存修改' : '➕ 新增活動'}
             </button>
+            {editingEventId && (
+              <button onClick={cancelEditingEvent} style={{ width: '100%', marginTop: 8, padding: 12, borderRadius: 10, border: '1px solid #d1d5db', background: '#fff', color: '#6b7280', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+                取消修改
+              </button>
+            )}
 
             <div style={{ fontSize: 14, fontWeight: 700, color: '#111', margin: '20px 0 10px', paddingBottom: 6, borderBottom: '1px solid #e5e7eb' }}>現有活動</div>
             {events.map(ev => (
@@ -497,9 +534,14 @@ export default function Home() {
                       <span>📍 {ev.location}</span>
                     </div>
                   </div>
-                  <button onClick={() => deleteEvent(ev.id)} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid #dc2626', background: '#fff', color: '#dc2626', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                    刪除
-                  </button>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => startEditingEvent(ev)} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid #2563eb', background: '#fff', color: '#2563eb', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                      修改
+                    </button>
+                    <button onClick={() => deleteEvent(ev.id)} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid #dc2626', background: '#fff', color: '#dc2626', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                      刪除
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
