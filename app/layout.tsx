@@ -1,6 +1,6 @@
 export const metadata = {
-  title: '會員出席調查',
-  description: '活動出席統計系統',
+  title: '東福領唱出席調查',
+  description: '出席統計系統',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
