@@ -26,33 +26,11 @@ interface Attendance {
   updated_at: string
 }
 
-const MEMBERS: Member[] = [
-  { id: 'm1', name: '王小明', role: 'member' },
-  { id: 'm2', name: '李大華', role: 'member' },
-  { id: 'm3', name: '張美玲', role: 'member' },
-  { id: 'm4', name: '陳志偉', role: 'member' },
-  { id: 'm5', name: '林小芬', role: 'member' },
-  { id: 'm6', name: '黃建國', role: 'member' },
-  { id: 'm7', name: '周雅芳', role: 'member' },
-  { id: 'm8', name: '吳志明', role: 'member' },
-  { id: 'm9', name: '鄭淑華', role: 'member' },
-  { id: 'm10', name: '劉德華', role: 'member' },
-  { id: 'm11', name: '趙雅芝', role: 'member' },
-  { id: 'm12', name: '孫中山', role: 'member' },
-  { id: 'm13', name: '錢學森', role: 'member' },
-  { id: 'm14', name: '周杰倫', role: 'member' },
-  { id: 'm15', name: '蔡依林', role: 'member' },
-  { id: 'm16', name: '林志玲', role: 'member' },
-  { id: 'm17', name: '郭台銘', role: 'member' },
-  { id: 'm18', name: '張忠謀', role: 'member' },
-  { id: 'm19', name: '王建民', role: 'member' },
-  { id: 'm20', name: '陳金鋒', role: 'member' },
-]
-
 export default function Home() {
   const [tab, setTab] = useState<'events' | 'stats' | 'admin'>('events')
   const [isAdmin, setIsAdmin] = useState(false)
   const [currentUser, setCurrentUser] = useState('王小明')
+  const [databaseMembers, setDatabaseMembers] = useState<Member[]>([])
   const [events, setEvents] = useState<Event[]>([])
   const [attendances, setAttendances] = useState<Attendance[]>([])
   const [detailEvent, setDetailEvent] = useState<Event | null>(null)
@@ -66,8 +44,16 @@ export default function Home() {
 
   const fetchData = useCallback(async () => {
     setLoading(true)
-    const { data: evData } = await supabase.from('events').select('*').order('event_date', { ascending: true })
-    const { data: attData } = await supabase.from('attendances').select('*')
+    const [{ data: memberData }, { data: evData }, { data: attData }] = await Promise.all([
+      supabase.from('members').select('*').order('name', { ascending: true }),
+      supabase.from('events').select('*').order('event_date', { ascending: true }),
+      supabase.from('attendances').select('*'),
+    ])
+    const loadedMembers = memberData || []
+    setDatabaseMembers(loadedMembers)
+    if (loadedMembers.length > 0) {
+      setCurrentUser(current => loadedMembers.some(member => member.name === current) ? current : loadedMembers[0].name)
+    }
     setEvents(evData || [])
     setAttendances(attData || [])
     setLoading(false)
@@ -87,7 +73,7 @@ export default function Home() {
   }
 
   const setRSVP = async (eventId: string, status: string) => {
-    const memberId = MEMBERS.find(m => m.name === currentUser)?.id
+    const memberId = databaseMembers.find(m => m.name === currentUser)?.id
     if (!memberId) return
     const existing = attendances.find(a => a.event_id === eventId && a.member_id === memberId)
     if (existing) {
@@ -118,10 +104,7 @@ export default function Home() {
 
   // Seed demo data
   const seedData = async () => {
-    // Insert members
-    for (const m of MEMBERS) {
-      await supabase.from('members').upsert({ id: m.id, name: m.name, role: m.role }, { onConflict: 'id' })
-    }
+    if (databaseMembers.length === 0) return alert('資料庫中尚無團員，請先新增 members 資料。')
     // Insert demo events
     const { data: evs } = await supabase.from('events').insert([
       { title: '8月會員大會', event_date: '2026-08-30', event_time: '14:00-17:00', location: '市民活動中心 3F' },
@@ -132,7 +115,7 @@ export default function Home() {
     if (evs) {
       const demoAttendances = []
       for (const ev of evs) {
-        for (const m of MEMBERS) {
+        for (const m of databaseMembers) {
           const r = Math.random()
           let status: string | null = null
           if (r < 0.5) status = 'yes'
@@ -150,7 +133,7 @@ export default function Home() {
   }
 
   const myStatus = (eventId: string) => {
-    const m = MEMBERS.find(x => x.name === currentUser)
+    const m = databaseMembers.find(x => x.name === currentUser)
     return m ? getStatus(eventId, m.id) : null
   }
 
@@ -167,21 +150,21 @@ export default function Home() {
     <div style={{ maxWidth: 480, margin: '0 auto', background: '#fff', minHeight: '100vh' }}>
       {/* Header */}
       <div style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>📅 會員出席調查</h1>
+        <h1 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>📅 東福領唱出席調查</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <select
             value={currentUser}
             onChange={e => setCurrentUser(e.target.value)}
             style={{ fontSize: 13, padding: '4px 8px', borderRadius: 6, border: '1px solid #e5e7eb' }}
           >
-            {MEMBERS.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+            {databaseMembers.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
           </select>
           <span style={{
             fontSize: 11, padding: '3px 10px', borderRadius: 12, fontWeight: 700,
             background: isAdmin ? '#dbeafe' : '#f3f4f6',
             color: isAdmin ? '#2563eb' : '#6b7280'
           }}>
-            {isAdmin ? '管理者' : '會員'}
+            {isAdmin ? '管理者' : '團員'}
           </span>
         </div>
       </div>
@@ -246,7 +229,7 @@ export default function Home() {
               const yes = countFor(ev.id, 'yes')
               const maybe = countFor(ev.id, 'maybe')
               const no = countFor(ev.id, 'no')
-              const empty = MEMBERS.length - yes - maybe - no
+              const empty = databaseMembers.length - yes - maybe - no
               return (
                 <div
                   key={ev.id}
@@ -339,9 +322,9 @@ export default function Home() {
               { label: '未回覆', status: 'empty', color: '#9ca3af' },
             ].map(item => {
               const count = item.status === 'empty'
-                ? MEMBERS.length - countFor(detailEvent.id, 'yes') - countFor(detailEvent.id, 'maybe') - countFor(detailEvent.id, 'no')
+                ? databaseMembers.length - countFor(detailEvent.id, 'yes') - countFor(detailEvent.id, 'maybe') - countFor(detailEvent.id, 'no')
                 : countFor(detailEvent.id, item.status)
-              const pct = (count / MEMBERS.length) * 100
+              const pct = databaseMembers.length ? (count / databaseMembers.length) * 100 : 0
               return (
                 <div key={item.status} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                   <div style={{ width: 50, fontSize: 13, fontWeight: 600, color: item.color }}>{item.label}</div>
@@ -353,8 +336,8 @@ export default function Home() {
               )
             })}
 
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#111', margin: '16px 0 10px', paddingBottom: 6, borderBottom: '1px solid #e5e7eb' }}>會員名單</div>
-            {MEMBERS.map(m => {
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#111', margin: '16px 0 10px', paddingBottom: 6, borderBottom: '1px solid #e5e7eb' }}>團員名單</div>
+            {databaseMembers.map(m => {
               const s = getStatus(detailEvent.id, m.id)
               const sl = statusLabel(s)
               return (
@@ -377,7 +360,7 @@ export default function Home() {
                 { label: '確認出席', get: () => attendances.filter(a => a.status === 'yes').length, color: '#16a34a' },
                 { label: '可能出席', get: () => attendances.filter(a => a.status === 'maybe').length, color: '#ca8a04' },
                 { label: '不出席', get: () => attendances.filter(a => a.status === 'no').length, color: '#dc2626' },
-                { label: '未回覆', get: () => events.length * MEMBERS.length - attendances.filter(a => a.status).length, color: '#9ca3af' },
+                { label: '未回覆', get: () => events.length * databaseMembers.length - attendances.filter(a => a.status).length, color: '#9ca3af' },
               ].map(s => (
                 <div key={s.label} style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: 14, textAlign: 'center' }}>
                   <div style={{ fontSize: 28, fontWeight: 800, color: s.color }}>{s.get()}</div>
@@ -402,7 +385,7 @@ export default function Home() {
                     <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                       <div style={{ width: 50, fontSize: 12, fontWeight: 600, color: item.color }}>{item.label}</div>
                       <div style={{ flex: 1, height: 8, background: '#e5e7eb', borderRadius: 4, overflow: 'hidden' }}>
-                        <div style={{ width: `${(item.count / MEMBERS.length) * 100}%`, height: '100%', background: item.color, borderRadius: 4 }} />
+                        <div style={{ width: `${databaseMembers.length ? (item.count / databaseMembers.length) * 100 : 0}%`, height: '100%', background: item.color, borderRadius: 4 }} />
                       </div>
                       <div style={{ width: 24, textAlign: 'right', fontSize: 12, fontWeight: 700 }}>{item.count}</div>
                     </div>
