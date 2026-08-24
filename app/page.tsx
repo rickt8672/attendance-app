@@ -53,11 +53,23 @@ export default function Home() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     const [{ data: memberData }, { data: evData }, { data: attData }] = await Promise.all([
-      supabase.from('members').select('*').order('name', { ascending: true }),
+      supabase.from('members').select('*'),
       supabase.from('events').select('*').order('event_date', { ascending: true }),
       supabase.from('attendances').select('*'),
     ])
-    const loadedMembers = memberData || []
+    const loadedMembers = [...(memberData || [])].sort((a, b) => {
+      const getIdNumber = (value: string) => {
+        const match = value.match(/\d+/g)
+        if (!match) return Number.MAX_SAFE_INTEGER
+        return Number(match[match.length - 1])
+      }
+
+      const aNumber = getIdNumber(String(a.id))
+      const bNumber = getIdNumber(String(b.id))
+
+      if (aNumber !== bNumber) return aNumber - bNumber
+      return String(a.id).localeCompare(String(b.id), undefined, { numeric: true, sensitivity: 'base' })
+    })
     setDatabaseMembers(loadedMembers)
     setEvents(evData || [])
     setAttendances(attData || [])
