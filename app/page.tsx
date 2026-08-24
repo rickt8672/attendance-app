@@ -446,18 +446,32 @@ export default function Home() {
             })}
 
             <div style={{ fontSize: 14, fontWeight: 700, color: '#111', margin: '16px 0 10px', paddingBottom: 6, borderBottom: '1px solid #e5e7eb' }}>團員名單</div>
-            {databaseMembers.map(m => {
-              const s = getStatus(detailEvent.id, m.id)
-              const sl = statusLabel(s)
-              return (
-                <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #f3f4f6' }}>
-                  <span style={{ fontSize: 14, color: '#111' }}>{m.name}</span>
-                  <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 8, background: sl.bg, color: sl.color }}>
-                    {sl.text}
-                  </span>
-                </div>
-              )
-            })}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px 14px' }}>
+              {databaseMembers.map(m => {
+                const s = getStatus(detailEvent.id, m.id)
+                const sl = statusLabel(s)
+                return (
+                  <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', border: '1px solid #f3f4f6', borderRadius: 10, background: '#fff' }}>
+                    <span style={{ fontSize: 14, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 8, background: sl.bg, color: sl.color, flexShrink: 0 }}>
+                      {sl.text}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+            <style jsx>{`
+              @media (min-width: 640px) {
+                div[style*="grid-template-columns: repeat(2, minmax(0, 1fr))"] {
+                  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+                }
+              }
+              @media (min-width: 960px) {
+                div[style*="grid-template-columns: repeat(2, minmax(0, 1fr))"] {
+                  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+                }
+              }
+            `}</style>
           </div>
         )}
 
