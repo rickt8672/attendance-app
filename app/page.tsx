@@ -29,7 +29,11 @@ interface Attendance {
 export default function Home() {
   const [tab, setTab] = useState<'events' | 'stats' | 'admin'>('events')
   const [isAdmin, setIsAdmin] = useState(false)
-  const [currentUser, setCurrentUser] = useState('王小明')
+  const [currentUser, setCurrentUser] = useState('')
+  const [memberIdInput, setMemberIdInput] = useState('')
+  const [isVerified, setIsVerified] = useState(false)
+  const [hasEnteredApp, setHasEnteredApp] = useState(false)
+  const [verificationError, setVerificationError] = useState('')
   const [databaseMembers, setDatabaseMembers] = useState<Member[]>([])
   const [events, setEvents] = useState<Event[]>([])
   const [attendances, setAttendances] = useState<Attendance[]>([])
@@ -42,6 +46,9 @@ export default function Home() {
   const [newTime, setNewTime] = useState('')
   const [newLocation, setNewLocation] = useState('')
 
+  const currentMember = databaseMembers.find(member => member.name === currentUser)
+  const canSwitchAdminMode = isVerified && currentMember?.role === 'admin'
+
   const fetchData = useCallback(async () => {
     setLoading(true)
     const [{ data: memberData }, { data: evData }, { data: attData }] = await Promise.all([
@@ -51,9 +58,6 @@ export default function Home() {
     ])
     const loadedMembers = memberData || []
     setDatabaseMembers(loadedMembers)
-    if (loadedMembers.length > 0) {
-      setCurrentUser(current => loadedMembers.some(member => member.name === current) ? current : loadedMembers[0].name)
-    }
     setEvents(evData || [])
     setAttendances(attData || [])
     setLoading(false)
@@ -73,6 +77,7 @@ export default function Home() {
   }
 
   const setRSVP = async (eventId: string, status: string) => {
+    if (!isVerified) return
     const memberId = databaseMembers.find(m => m.name === currentUser)?.id
     if (!memberId) return
     const existing = attendances.find(a => a.event_id === eventId && a.member_id === memberId)
@@ -82,6 +87,19 @@ export default function Home() {
       await supabase.from('attendances').insert({ event_id: eventId, member_id: memberId, status })
     }
     await fetchData()
+  }
+
+  const verifyMember = () => {
+    const selectedMember = databaseMembers.find(member => member.name === currentUser)
+    if (selectedMember && memberIdInput.trim() === selectedMember.id) {
+      setIsVerified(true)
+      setHasEnteredApp(true)
+      setIsAdmin(false)
+      setVerificationError('')
+      return
+    }
+    setIsVerified(false)
+    setVerificationError('會員姓名和會員 ID 不相符')
   }
 
   const addEvent = async () => {
@@ -146,6 +164,49 @@ export default function Home() {
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center' }}>載入中...</div>
 
+  if (!hasEnteredApp) return (
+    <div style={{ maxWidth: 480, margin: '0 auto', padding: 24, background: '#fff', minHeight: '100vh', boxSizing: 'border-box' }}>
+      <h1 style={{ margin: '40px 0 8px', fontSize: 22, fontWeight: 800 }}>東福領唱出席調查</h1>
+      <p style={{ margin: '0 0 24px', color: '#6b7280', fontSize: 14 }}>請選擇您的會員姓名並輸入會員 ID。</p>
+      <div style={{ marginBottom: 14 }}>
+        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 5 }}>會員姓名</label>
+        <select
+          value={currentUser}
+          onChange={e => { setCurrentUser(e.target.value); setVerificationError('') }}
+          style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 14, boxSizing: 'border-box' }}
+        >
+          <option value="">請選擇會員姓名</option>
+          {databaseMembers.map(member => <option key={member.id} value={member.name}>{member.name}</option>)}
+        </select>
+      </div>
+      <div style={{ marginBottom: 14 }}>
+        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 5 }}>會員 ID</label>
+        <input
+          value={memberIdInput}
+          onChange={e => { setMemberIdInput(e.target.value); setVerificationError('') }}
+          placeholder="輸入您的會員 ID"
+          autoComplete="off"
+          style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 14, boxSizing: 'border-box' }}
+        />
+      </div>
+      {verificationError && <div style={{ marginBottom: 14, color: '#dc2626', fontSize: 13 }}>{verificationError}</div>}
+      <button
+        onClick={verifyMember}
+        disabled={!currentUser || !memberIdInput.trim()}
+        style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', background: currentUser && memberIdInput.trim() ? '#111' : '#d1d5db', color: '#fff', fontSize: 14, fontWeight: 700, cursor: currentUser && memberIdInput.trim() ? 'pointer' : 'not-allowed' }}
+      >
+        驗證並進入
+      </button>
+      <button
+        onClick={() => { setHasEnteredApp(true); setIsVerified(false) }}
+        disabled={!currentUser}
+        style={{ width: '100%', marginTop: 10, padding: 12, borderRadius: 10, border: '1px solid #d1d5db', background: '#fff', color: currentUser ? '#111' : '#9ca3af', fontSize: 14, fontWeight: 700, cursor: currentUser ? 'pointer' : 'not-allowed' }}
+      >
+        以唯讀模式進入
+      </button>
+    </div>
+  )
+
   return (
     <div style={{ maxWidth: 480, margin: '0 auto', background: '#fff', minHeight: '100vh' }}>
       {/* Header */}
@@ -154,7 +215,7 @@ export default function Home() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <select
             value={currentUser}
-            onChange={e => setCurrentUser(e.target.value)}
+            onChange={e => { setCurrentUser(e.target.value); setIsVerified(false); setHasEnteredApp(false); setIsAdmin(false); setMemberIdInput('') }}
             style={{ fontSize: 13, padding: '4px 8px', borderRadius: 6, border: '1px solid #e5e7eb' }}
           >
             {databaseMembers.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
@@ -173,15 +234,18 @@ export default function Home() {
       <div style={{ padding: '10px 16px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13, color: '#6b7280' }}>
         <span>切換管理者模式</span>
         <div
-          onClick={() => setIsAdmin(!isAdmin)}
+          onClick={() => { if (canSwitchAdminMode) setIsAdmin(!isAdmin) }}
+          role="switch"
+          aria-checked={isAdmin}
+          aria-disabled={!canSwitchAdminMode}
           style={{
-            width: 40, height: 22, borderRadius: 11, background: isAdmin ? '#2563eb' : '#d1d5db',
-            position: 'relative', cursor: 'pointer', transition: 'background 0.2s'
+            width: 40, height: 22, borderRadius: 11, background: canSwitchAdminMode && isAdmin ? '#2563eb' : '#d1d5db',
+            position: 'relative', cursor: canSwitchAdminMode ? 'pointer' : 'not-allowed', transition: 'background 0.2s', opacity: canSwitchAdminMode ? 1 : 0.6
           }}
         >
           <div style={{
             width: 18, height: 18, borderRadius: '50%', background: '#fff',
-            position: 'absolute', top: 2, left: isAdmin ? 20 : 2, transition: 'left 0.2s',
+            position: 'absolute', top: 2, left: canSwitchAdminMode && isAdmin ? 20 : 2, transition: 'left 0.2s',
             boxShadow: '0 1px 3px rgba(0,0,0,0.15)'
           }} />
         </div>
@@ -299,13 +363,14 @@ export default function Home() {
                 return (
                   <button
                     key={btn.key}
-                    onClick={() => setRSVP(detailEvent.id, btn.key)}
+                    onClick={() => isVerified && setRSVP(detailEvent.id, btn.key)}
+                    disabled={!isVerified}
                     style={{
                       flex: 1, padding: 12, borderRadius: 10,
                       border: `1.5px solid ${selected ? btn.color : '#e5e7eb'}`,
                       background: selected ? btn.color + '14' : '#fff',
                       color: selected ? btn.color : '#6b7280',
-                      fontSize: 13, fontWeight: 700, cursor: 'pointer'
+                      fontSize: 13, fontWeight: 700, cursor: isVerified ? 'pointer' : 'not-allowed', opacity: isVerified ? 1 : 0.55
                     }}
                   >
                     {btn.label}
