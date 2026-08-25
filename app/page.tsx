@@ -22,7 +22,7 @@ interface Attendance {
   id: string
   event_id: string
   member_id: string
-  status: 'yes' | 'maybe' | 'no' | null
+  status: 'yes' | 'maybe' | 'no' | 'rest' | null
   updated_at: string
 }
 
@@ -203,6 +203,7 @@ export default function Home() {
     if (s === 'yes') return { text: '出席', color: '#16a34a', bg: '#dcfce7' }
     if (s === 'maybe') return { text: '可能', color: '#ca8a04', bg: '#fef9c3' }
     if (s === 'no') return { text: '請假', color: '#dc2626', bg: '#fee2e2' }
+    if (s === 'rest') return { text: '休息', color: '#2563eb', bg: '#dbeafe' }
     return { text: '未回覆', color: '#9ca3af', bg: '#f3f4f6' }
   }
 
@@ -337,7 +338,8 @@ export default function Home() {
               const yes = countFor(ev.id, 'yes')
               const maybe = countFor(ev.id, 'maybe')
               const no = countFor(ev.id, 'no')
-              const empty = databaseMembers.length - yes - maybe - no
+              const rest = countFor(ev.id, 'rest')
+              const empty = databaseMembers.length - yes - maybe - no - rest
               return (
                 <div
                   key={ev.id}
@@ -370,6 +372,11 @@ export default function Home() {
                     <span style={{ fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 8, background: '#f3f4f6', color: '#6b7280' }}>
                       ❌ <span style={{ color: '#111' }}>{no}</span>
                     </span>
+                    {ev.title.includes('服事') && (
+                      <span style={{ fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 8, background: '#f3f4f6', color: '#6b7280' }}>
+                        💤 <span style={{ color: '#111' }}>{rest}</span>
+                      </span>
+                    )}
                     <span style={{ fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 8, background: '#f3f4f6', color: '#6b7280' }}>
                       ❓ <span style={{ color: '#111' }}>{empty}</span>
                     </span>
@@ -402,6 +409,7 @@ export default function Home() {
                 { key: 'yes', label: '✅ 出席', color: '#16a34a' },
                 { key: 'maybe', label: '🤔 可能', color: '#ca8a04' },
                 { key: 'no', label: '❌ 請假', color: '#dc2626' },
+                ...(detailEvent.title.includes('服事') ? [{ key: 'rest', label: '💤 休息', color: '#2563eb' }] : []),
               ].map(btn => {
                 const selected = myStatus(detailEvent.id) === btn.key
                 return (
@@ -428,10 +436,11 @@ export default function Home() {
               { label: '出席', status: 'yes', color: '#16a34a' },
               { label: '可能', status: 'maybe', color: '#ca8a04' },
               { label: '請假', status: 'no', color: '#dc2626' },
+              ...(detailEvent.title.includes('服事') ? [{ label: '休息', status: 'rest', color: '#2563eb' }] : []),
               { label: '未回覆', status: 'empty', color: '#9ca3af' },
             ].map(item => {
               const count = item.status === 'empty'
-                ? databaseMembers.length - countFor(detailEvent.id, 'yes') - countFor(detailEvent.id, 'maybe') - countFor(detailEvent.id, 'no')
+                ? databaseMembers.length - countFor(detailEvent.id, 'yes') - countFor(detailEvent.id, 'maybe') - countFor(detailEvent.id, 'no') - countFor(detailEvent.id, 'rest')
                 : countFor(detailEvent.id, item.status)
               const pct = databaseMembers.length ? (count / databaseMembers.length) * 100 : 0
               return (
@@ -483,6 +492,7 @@ export default function Home() {
                 { label: '確認出席', get: () => attendances.filter(a => a.status === 'yes').length, color: '#16a34a' },
                 { label: '可能出席', get: () => attendances.filter(a => a.status === 'maybe').length, color: '#ca8a04' },
                 { label: '請假', get: () => attendances.filter(a => a.status === 'no').length, color: '#dc2626' },
+                { label: '休息', get: () => attendances.filter(a => a.status === 'rest').length, color: '#2563eb' },
                 { label: '未回覆', get: () => events.length * databaseMembers.length - attendances.filter(a => a.status).length, color: '#9ca3af' },
               ].map(s => (
                 <div key={s.label} style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: 14, textAlign: 'center' }}>
@@ -504,6 +514,7 @@ export default function Home() {
                     { label: '出席', count: yes, color: '#16a34a' },
                     { label: '可能', count: maybe, color: '#ca8a04' },
                     { label: '請假', count: no, color: '#dc2626' },
+                    ...(ev.title.includes('服事') ? [{ label: '休息', count: countFor(ev.id, 'rest'), color: '#2563eb' }] : []),
                   ].map(item => (
                     <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                       <div style={{ width: 50, fontSize: 12, fontWeight: 600, color: item.color }}>{item.label}</div>
