@@ -91,13 +91,15 @@ export default function Home() {
 
   const setRSVP = async (eventId: string, status: string) => {
     if (!isVerified) return
-    const memberId = databaseMembers.find(m => m.name === currentUser)?.id
-    if (!memberId) return
-    const existing = attendances.find(a => a.event_id === eventId && a.member_id === memberId)
+    const targetMember = databaseMembers.find(m => m.name === currentUser)
+    if (!targetMember) return
+    if (!isAdmin && currentMember?.id !== targetMember.id) return
+
+    const existing = attendances.find(a => a.event_id === eventId && a.member_id === targetMember.id)
     if (existing) {
       await supabase.from('attendances').update({ status }).eq('id', existing.id)
     } else {
-      await supabase.from('attendances').insert({ event_id: eventId, member_id: memberId, status })
+      await supabase.from('attendances').insert({ event_id: eventId, member_id: targetMember.id, status })
     }
     await fetchData()
   }
@@ -260,7 +262,19 @@ export default function Home() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <select
             value={currentUser}
-            onChange={e => { setCurrentUser(e.target.value); setIsVerified(false); setHasEnteredApp(false); setIsAdmin(false); setMemberIdInput('') }}
+            onChange={e => {
+              const nextUser = e.target.value
+              setCurrentUser(nextUser)
+              if (isAdmin) {
+                setHasEnteredApp(true)
+                setIsVerified(true)
+                return
+              }
+              setIsVerified(false)
+              setHasEnteredApp(false)
+              setIsAdmin(false)
+              setMemberIdInput('')
+            }}
             style={{ fontSize: 13, padding: '4px 8px', borderRadius: 6, border: '1px solid #e5e7eb' }}
           >
             {databaseMembers.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
